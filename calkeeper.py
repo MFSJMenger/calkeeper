@@ -255,8 +255,9 @@ def get_pycode(calculations, *, with_keeper=False, header=True,
     if with_keeper is True:
         body = f"{keeper} = CalculationKeeper()\n\n\n"
     else:
+        keeper = None
         body = ""
-    calculations = ',\n'.join(calc.as_pycode() for calc in calculations)
+    calculations = ',\n'.join(calc.as_pycode(clsname=clsname, keeper=keeper) for calc in calculations)
     body += "\n# currently missing calculations"
     body += f"\n{calculationsname.strip()} = [{calculations}]\n\n\n"
 
