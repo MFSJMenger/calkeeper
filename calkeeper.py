@@ -40,8 +40,12 @@ class Calculation:
     Methods
     -------
 
-    as_pycode(clsname='Calculation', keeper=None)
-        Gives the class as python code string, to be used e.g. in additional scripts
+    from_dct(dct, *, keeper=None)
+        Initializes a calculation object from a dictionary
+
+
+    as_dict()
+        Return current object as dictionary
 
     within()
         Contextmanager that changes the current folder to the folder of the calculation class
@@ -55,6 +59,8 @@ class Calculation:
     check()
         Checks if all required files are present
 
+    as_pycode(clsname='Calculation', keeper=None)
+        Gives the class as python code string, to be used e.g. in additional scripts
     """
 
     def __init__(self, inputfile, required_output_files, *,
@@ -67,10 +73,56 @@ class Calculation:
         # register itself
         self._register_itself(keeper)
 
+    @classmethod
+    def from_dct(cls, dct, *, keeper=None):
+        """Initializes a calculation object from a dictionary
+
+        Parameters
+        ----------
+
+        dct: dict
+            Dictionary representing the Calculation object
+
+        keeper: str, optional
+            if given, name of the CalculationKeeper object in the created python code
+            if None, no keeper will be specified
+
+        Returns
+        -------
+
+        self:
+            Calculation instance
+        """
+        return cls(dct['inputfile'], dct['required_output_files'],
+                   folder=dct['folder'], software=dct.get('software', None),
+                   keeper=keeper)
+
     @property
     def filename(self):
         """Returns the inputfilename of the calculation"""
         return self.inputfile.name
+
+    def as_dict(self):
+        """Return current object as dictionary
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+
+        dict:
+            Dictionary representing the current object
+            fields: inputfile, required_output_files, folder
+            optional fields: software
+        """
+        dct = {'inputfile': self.inputfile.name,
+                'required_output_files': self.required_output_files,
+                'folder': str(self.folder),
+                }
+        if self.software is not None:
+            dct['software'] = self.software
+        return dct
 
     def as_pycode(self, *, clsname='Calculation', keeper=None):
         """Return current object as python code
@@ -106,9 +158,11 @@ class Calculation:
     def within(self):
         """Contextmanager to perform a set of option within the folder of the system"""
         current = os.getcwd()
-        os.chdir(self.folder)
-        yield
-        os.chdir(current)
+        try:
+            os.chdir(self.folder)
+            yield
+        finally:
+            os.chdir(current)
 
     def input_exists(self):
         """check if the inputfile is already present
@@ -257,7 +311,8 @@ def get_pycode(calculations, *, with_keeper=False, header=True,
     else:
         keeper = None
         body = ""
-    calculations = ',\n'.join(calc.as_pycode(clsname=clsname, keeper=keeper) for calc in calculations)
+    calculations = ',\n'.join(calc.as_pycode(clsname=clsname, keeper=keeper)
+                                             for calc in calculations)
     body += "\n# currently missing calculations"
     body += f"\n{calculationsname.strip()} = [{calculations}]\n\n\n"
 
@@ -377,10 +432,28 @@ class CalculationKeeper:
     get_pycode(only_incomplete=True, with_keeper=False, header=True,
                clsname='Calculation', keeper='keeper', calculationsname='calculations')
         get basic python code for a set of calculations
+
+    get_incomplete()
+        Return a list of all incompleted calculations
     """
 
-    def __init__(self):
-        self._calculations = []
+    def __init__(self, calculations=None):
+        if calculations is None:
+            calculations = []
+        self._calculations = calculations
+
+    @classmethod
+    def from_json(cls, jsonstr):
+        """Returns the CalculationKeeper from a jsonstring"""
+        self = cls()
+        calculations = json.loads(jsonstr)
+        for cal in calculations:
+            self.calculation_from_dct(cal)
+        return self
+
+    def calculation_from_dct(self, dct):
+        """Returns Calculation class instance with this specific keeper from a dictionary"""
+        return Calculation.from_dct(dct, keeper=self)
 
     def calculation(self, *args, **kwargs):
         """Returns Calculation class instance with this specific keeper"""
@@ -436,7 +509,7 @@ class CalculationKeeper:
 
         """
         if clear_all is False:
-            self._calculations = self._get_incomplete()
+            self._calculations = self.get_incomplete()
         else:
             self._calculations = []
 
@@ -492,9 +565,32 @@ class CalculationKeeper:
         if do_all is True:
             calculations = self._calculations
         else:
-            calculations = self._get_incomplete()
+            calculations = self.get_incomplete()
         #
         perform_calculations(calculations, methods)
+
+    def as_json(self, *, only_incomplete=True):
+        """Returns a json representation of the current CalculationKeeper
+
+        Parameters
+        ----------
+
+        only_incomplete : bool, optional
+            use only incomplete calculations, default: True
+        Returns
+        -------
+
+        str:
+            json representation of the CalculationKeeper
+        """
+
+        if only_incomplete is False:
+            calculations = self._calculations
+        else:
+            calculations = self.get_incomplete()
+
+        result = [cal.as_dict() for cal in calculations]
+        return json.dumps(result, indent=4)
 
     def get_pycode(self, *, only_incomplete=True, with_keeper=False, header=True,
                    clsname='Calculation', keeper='keeper', calculationsname='calculations'):
@@ -531,11 +627,11 @@ class CalculationKeeper:
         if only_incomplete is False:
             calculations = self._calculations
         else:
-            calculations = self._get_incomplete()
+            calculations = self.get_incomplete()
         return get_pycode(calculations, with_keeper=with_keeper, header=header, clsname=clsname,
                           keeper=keeper, calculationsname=calculationsname)
 
-    def _get_incomplete(self):
+    def get_incomplete(self):
         """Return a list of all incompleted calculations"""
         calculations = []
         for calc in self._calculations:
