@@ -117,9 +117,9 @@ class Calculation:
             optional fields: software
         """
         dct = {'inputfile': self.inputfile.name,
-                'required_output_files': self.required_output_files,
-                'folder': str(self.folder),
-                }
+               'required_output_files': self.required_output_files,
+               'folder': str(self.folder),
+               }
         if self.software is not None:
             dct['software'] = self.software
         return dct
@@ -312,7 +312,7 @@ def get_pycode(calculations, *, with_keeper=False, header=True,
         keeper = None
         body = ""
     calculations = ',\n'.join(calc.as_pycode(clsname=clsname, keeper=keeper)
-                                             for calc in calculations)
+                              for calc in calculations)
     body += "\n# currently missing calculations"
     body += f"\n{calculationsname.strip()} = [{calculations}]\n\n\n"
 
