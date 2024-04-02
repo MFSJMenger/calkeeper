@@ -398,7 +398,7 @@ def perform_calculations(calculations, methods, ncores):
         try:
             method(calculation, ncores)
         except CalculationFailed:
-            raise CalculationFailed("Calculation failed in {calculation.folder}") from None
+            raise CalculationFailed(f"Calculation failed in {calculation.folder}") from None
 
         try:
             calculation.check()
