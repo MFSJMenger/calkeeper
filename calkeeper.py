@@ -359,7 +359,7 @@ class CalculationFailed(SystemExit):
     """Error passed if the direct calculation failed"""
 
 
-def perform_calculations(calculations, methods):
+def perform_calculations(calculations, methods, ncores):
     """Perform the calculations  using a set of methods
 
     Parameters
@@ -372,6 +372,9 @@ def perform_calculations(calculations, methods):
         Dictionary of software names, and corresponding functions
         the function has to accept an Calculation object as input
         and should Raise an CalculationFailed Error incase of an issue
+
+    ncores : int
+        Number of cores
 
     Returns
     -------
@@ -393,7 +396,7 @@ def perform_calculations(calculations, methods):
         if method is None:
             raise ValueError(f"Software '{calculation.software}' not suppored")
         try:
-            method(calculation)
+            method(calculation, ncores)
         except CalculationFailed:
             raise CalculationFailed("Calculation failed in {calculation.folder}") from None
 
@@ -530,11 +533,10 @@ class CalculationKeeper:
 
         CalculationIncompleteError:
             In case some calculations are still missing
-
         """
         return check(self._calculations)
 
-    def do_calculations(self, methods, *, do_all=False):
+    def do_calculations(self, methods, ncores, *, do_all=False):
         """Perform the calculations  using a set of methods
 
         Parameters
@@ -567,7 +569,7 @@ class CalculationKeeper:
         else:
             calculations = self.get_incomplete()
         #
-        perform_calculations(calculations, methods)
+        perform_calculations(calculations, methods, ncores)
 
     def as_json(self, *, only_incomplete=True):
         """Returns a json representation of the current CalculationKeeper
